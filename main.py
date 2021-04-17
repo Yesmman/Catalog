@@ -1,4 +1,9 @@
 import json
+import os
+import pathlib
+from dataclasses import dataclass
+from typing import Callable
+
 from pydantic import BaseModel
 
 list_of_users = []
@@ -17,28 +22,37 @@ class Film(BaseModel):
     genre: str
     viewed: str = "No"
 
+    def __str__(self):
+        return f'{self.title} {self.year} {self.genre}'
+
+    def __repr__(self):
+        return str(self)
+
 
 def add_new_films():
-    file_f = open(f'{list_of_users[u_choice].username}_film_list.json', 'a')
-    choice = int(input("How many films do you want to add? "))
-    for obj in range(choice):
-        obj = Film(title=input("Input title: "), year=input("Input year: "), genre=input("Input genre: "))
-        file_f.write(str(obj.json()) + '\n')
-    file_f.close()
+    with open(f'{list_of_users[u_choice].username}_film_list.json', 'a') as file_f:
+        choice = int(input("How many films do you want to add? "))
+        for obj in range(choice):
+            obj = Film(
+                title=input("Input title: "),
+                year=input("Input year: "),
+                genre=input("Input genre: "),
+            )
+            file_f.write(obj.json() + '\n')
 
 
 def load_films():
-    file_f = open(f'{list_of_users[u_choice].username}_film_list.json', 'r')
-    j = 0
-    for lines in file_f:
-        smt = dict(json.loads(lines))
-        obj = Film(title=smt.get("title"), year=smt.get("year"), genre=smt.get("genre"))
-        list_of_users[u_choice].movie_list.append(obj)
-        print(list_of_users[u_choice].movie_list[j].title,
-              list_of_users[u_choice].movie_list[j].year,
-              list_of_users[u_choice].movie_list[j].genre)
-        j += 1
-    file_f.close()
+    user = list_of_users[u_choice]
+
+    with open(f'{user.username}_film_list.json', 'r') as file_f:
+        for j, lines in enumerate(file_f):
+            film_raw = json.loads(lines)
+
+            film = Film.parse_raw(film_raw)
+
+            user.movie_list.append(film)
+
+            print(film)
 
 
 def select_film():
@@ -47,35 +61,32 @@ def select_film():
           list_of_users[u_choice].movie_list[choice].viewed)
     print("Did you watch this movie? ")
     list_of_users[u_choice].movie_list[choice].viewed = input()
-    file_f = open(f'{list_of_users[u_choice].username}_film_list.json', 'w')
-    for obj in list_of_users[u_choice].movie_list:
-        file_f.write(str(obj.json())+'\n')
-    file_f.close()
+    with open(f'{list_of_users[u_choice].username}_film_list.json', 'w') as file_f:
+        for obj in list_of_users[u_choice].movie_list:
+            file_f.write(str(obj.json()) + '\n')
 
 
 def add_new_users():
-    file = open('users.json', 'a')
-    choice = int(input("How many users do you want to add? "))
-    for obj in range(choice):
-        obj = Users(movie_list=[], username=input())
-        file.write(str(obj.json()) + '\n')
-    file.close()
+    path = pathlib.Path(__file__).parent.joinpath('storage', 'users.json')
+    with open(path, 'a') as file:
+        choice = int(input("How many users do you want to add? "))
+        for obj in range(choice):
+            obj = Users(movie_list=[], username=input())
+            file.write(str(obj.json()) + '\n')
 
 
 def load_users():
-    file = open('users.json', 'r')
-    i = 0
-    for lines in file:
-        smt = dict(json.loads(lines))
-        obj = Users(movie_list=smt.get("movie_list"), username=smt.get("username"))
-        list_of_users.append(obj)
-        print(list_of_users[i].username)
-        i += 1
+    with open(os.path.join('storage', 'users.json'), 'r') as file:
+        for index, lines in enumerate(file):
+            smt = dict(json.loads(lines))
+            user = Users(movie_list=smt.get("movie_list"), username=smt.get("username"))
+            list_of_users.append(user)
+
+            print(f'{index} - {user.username}')
 
 
 def select_user():
-    user_choice = int(input("What user do you want to select? "))
-    return user_choice
+    return int(input("What user do you want to select? "))
 
 
 def choice_movies_input():
@@ -94,22 +105,51 @@ def choice_movies_input():
             select_film()
 
 
+@dataclass
+class MenuItem:
+    text: str
+    action: Callable
+
+
 def choice_user_input():
     choice = -1
+
+    menu = [
+        MenuItem(
+            text='add new users',
+            action=add_new_users,
+        ),
+        MenuItem(
+            text='load the list of users',
+            action=load_users,
+        )
+    ]
+
     while choice != 0:
-        choice = int(input("What do you want to do?\n"
-                           " 1 -- to add new users,\n"
-                           " 2 -- to load the list of users\n"
-                           " 3 -- to select the user\n"
-                           " 0 -- to exit\n"))
-        if choice == 1:
-            add_new_users()
-        elif choice == 2:
-            load_users()
-        elif choice == 3:
-            global u_choice
-            u_choice = select_user()
-            choice_movies_input()
+        print("What do you want to do?")
+
+        # choice = int(input("What do you want to do?\n"
+        #                    " 1 -- to add new users,\n"
+        #                    " 2 -- to load the list of users\n"
+        #                    " 3 -- to select the user\n"
+        #                    " 0 -- to exit\n"))
+        for index, menu_item in enumerate(menu):
+            print(f'{index} -- {menu_item.text}')
+
+        choice = int(input())
+
+        menu[choice].action()
+
+        global u_choice
+
+        # if choice == 1:
+        #     add_new_users()
+        # elif choice == 2:
+        #     load_users()
+        # elif choice == 3:
+        #
+        #     u_choice = select_user()
+        #     choice_movies_input()
 
 
 choice_user_input()
